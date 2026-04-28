@@ -1,0 +1,119 @@
+version: "3.9"
+
+# Production-oriented Compose for Coolify.
+# - No localhost URLs.
+# - Only the frontend is published; backend/mongo/minio/redis stay internal.
+# - Optional Redis enables Socket.IO horizontal scaling (buzz/rooms across replicas).
+#
+# Deploy approach:
+# - In Coolify, set environment variables (see `.env.prod.example`).
+# - Use managed Mongo/S3 if available; you can remove `mongo`/`minio` services.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: jeoparty
+    # Do not publish Mongo in production
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    # Do not publish Redis in production
+
+  minio:
+    # If you use real S3, remove this service and set S3_* env vars accordingly.
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    # Do not publish MinIO in production; proxy it only if needed
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}) do echo 'waiting for minio'; sleep 2; done;
+      /usr/bin/mc mb -p local/${S3_BUCKET} || true;
+      # In production prefer presigned URLs instead of public buckets. If you still
+      # want public reads, keep this line; otherwise remove it.
+      /usr/bin/mc anonymous set download local/${S3_BUCKET} || true;
+      exit 0;
+      "
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/jeoparty}
+      # Explicit allowlist for the web origin(s). Example:
+      # CORS_ORIGIN=https://jeoparty.example.com
+      CORS_ORIGIN: ${CORS_ORIGIN}
+
+      # Socket.IO scaling (optional; recommended if you run multiple backend replicas)
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+
+      # Media storage
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-jeoparty-media}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-${MINIO_ROOT_USER}}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
+      # MUST be a URL reachable by browsers (not localhost)
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL}
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      - mongo
+      - redis
+      - minio
+      - minio-init
+    expose:
+      - "4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/rooms/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # Use the public backend URL so browsers connect correctly.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL}
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mongo_data:
+  minio_data:
+  redis_data:
+

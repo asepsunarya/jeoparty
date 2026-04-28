@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap");
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
+  background:
+    radial-gradient(1200px 600px at 10% -20%, #141a8a 0%, transparent 60%),
+    radial-gradient(900px 500px at 90% 0%, #3a1177 0%, transparent 60%),
+    linear-gradient(180deg, #050634 0%, #020321 100%);
+  color: white;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: "Bebas Neue", Impact, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center px-5 py-3 rounded-xl font-semibold transition active:scale-95 select-none;
+}
+.btn-primary {
+  @apply btn bg-jeopardy-gold text-jeopardy-blue shadow-lg hover:shadow-xl hover:brightness-110;
+}
+.btn-ghost {
+  @apply btn bg-white/10 text-white hover:bg-white/20 backdrop-blur;
+}
+.btn-danger {
+  @apply btn bg-red-500 text-white hover:bg-red-400;
+}
+
+input,
+textarea,
+select {
+  @apply bg-white/10 text-white placeholder-white/50 border border-white/20 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-jeopardy-gold/60;
+}
+
+.card {
+  @apply rounded-2xl bg-white/5 border border-white/10 backdrop-blur-lg p-5;
+}
+
+/* Prose markdown inside questions */
+.prose-invert-tight p {
+  margin: 0.25em 0;
+}
+.prose-invert-tight code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0 4px;
+  border-radius: 4px;
+}

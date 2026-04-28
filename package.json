@@ -1,0 +1,22 @@
+{
+  "name": "jeoparty",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Real-time multiplayer Jeopardy party game",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @jeoparty/shared",
+    "lan": "node scripts/print-lan-urls.js",
+    "dev": "npm run build:shared && npm run lan && concurrently -k -n shared,backend,frontend -c gray,magenta,cyan \"npm:dev -w @jeoparty/shared\" \"npm:dev -w @jeoparty/backend\" \"npm:dev -w @jeoparty/frontend\"",
+    "build": "npm run build:shared && npm run build -w @jeoparty/backend && npm run build -w @jeoparty/frontend",
+    "start": "concurrently -k -n backend,frontend -c magenta,cyan \"npm:start -w @jeoparty/backend\" \"npm:start -w @jeoparty/frontend\"",
+    "lint": "npm run lint -w @jeoparty/backend && npm run lint -w @jeoparty/frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

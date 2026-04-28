@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: jeoparty-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: jeoparty
+
+  minio:
+    # S3-compatible object storage for local dev
+    image: minio/minio:latest
+    container_name: jeoparty-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: jeoparty
+      MINIO_ROOT_PASSWORD: jeoparty-secret
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set local http://minio:9000 jeoparty jeoparty-secret) do echo 'waiting for minio'; sleep 2; done;
+      /usr/bin/mc mb -p local/jeoparty-media || true;
+      /usr/bin/mc anonymous set download local/jeoparty-media;
+      exit 0;
+      "
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: jeoparty-backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      MONGO_URI: mongodb://mongo:27017/jeoparty
+      CORS_ORIGIN: http://localhost:3000
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: jeoparty-media
+      S3_ACCESS_KEY: jeoparty
+      S3_SECRET_KEY: jeoparty-secret
+      S3_PUBLIC_URL: http://localhost:9000/jeoparty-media
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      - mongo
+      - minio
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: jeoparty-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_WS_URL: http://localhost:4000
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
+  minio_data:
