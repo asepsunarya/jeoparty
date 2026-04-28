@@ -113,15 +113,15 @@ services:
       retries: 10
 
   edge:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: edge/Dockerfile
     restart: unless-stopped
     depends_on:
       - frontend
       - backend
     ports:
       - "80:80"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
 
 volumes:
   mongo_data:
