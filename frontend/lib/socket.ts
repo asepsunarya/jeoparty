@@ -14,7 +14,9 @@ export function getBackendUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_WS_URL;
   if (explicit) return explicit;
   if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:4000`;
+    // In production we typically run behind a reverse proxy (same origin).
+    // In local dev the backend is on :4000 and should be set via NEXT_PUBLIC_WS_URL.
+    return `${window.location.protocol}//${window.location.host}`;
   }
   return "http://localhost:4000";
 }

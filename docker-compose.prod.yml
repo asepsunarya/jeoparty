@@ -99,18 +99,29 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      # Use the public backend URL so browsers connect correctly.
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL}
+      # For single-app deployments behind Caddy, DO NOT set NEXT_PUBLIC_API_URL/WS_URL.
+      # The frontend will call same-origin `/api/*` and `/socket.io/*` which Caddy proxies
+      # to the backend. Keep these only if you expose the backend on a separate domain.
     depends_on:
       - backend
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 3s
       retries: 10
+
+  edge:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
 
 volumes:
   mongo_data:
