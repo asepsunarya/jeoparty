@@ -15,7 +15,8 @@ COPY --from=builder /repo/frontend/package.json ./package.json
 COPY --from=builder /repo/frontend/.next ./.next
 COPY --from=builder /repo/frontend/public ./public
 COPY --from=builder /repo/frontend/next.config.mjs ./next.config.mjs
-COPY --from=builder /repo/frontend/node_modules ./node_modules
+# npm workspaces installs node_modules at the repo root
+COPY --from=builder /repo/node_modules ./node_modules
 COPY --from=builder /repo/shared ./node_modules/@jeoparty/shared
 EXPOSE 3000
 CMD ["npm", "start"]
