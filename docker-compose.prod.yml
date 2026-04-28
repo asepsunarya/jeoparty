@@ -120,8 +120,11 @@ services:
     depends_on:
       - frontend
       - backend
-    ports:
-      - "80:80"
+    # IMPORTANT (Coolify): do NOT bind host port 80 here.
+    # Coolify's proxy already owns 80/443. Instead expose 80 internally and
+    # configure Coolify to route your domain to this service:80.
+    expose:
+      - "80"
 
 volumes:
   mongo_data:
