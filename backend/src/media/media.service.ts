@@ -1,5 +1,11 @@
-import { Injectable, Logger, BadRequestException } from "@nestjs/common";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { Injectable, Logger, BadRequestException, OnModuleInit } from "@nestjs/common";
+import {
+  CreateBucketCommand,
+  HeadBucketCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 import type { Media } from "@jeoparty/shared";
 import { parseYouTubeId } from "../common/youtube";
@@ -21,7 +27,7 @@ const ALLOWED_MIME: Record<string, "image" | "video" | "audio"> = {
 const MAX_BYTES = 40 * 1024 * 1024; // 40MB
 
 @Injectable()
-export class MediaService {
+export class MediaService implements OnModuleInit {
   private readonly log = new Logger(MediaService.name);
   private s3: S3Client;
   private bucket: string;
@@ -42,6 +48,45 @@ export class MediaService {
         secretAccessKey: process.env.S3_SECRET_KEY ?? "",
       },
     });
+  }
+
+  async onModuleInit() {
+    await this.ensureBucket();
+  }
+
+  private async ensureBucket() {
+    const policy = JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: "*",
+          Action: ["s3:GetObject"],
+          Resource: [`arn:aws:s3:::${this.bucket}/*`],
+        },
+      ],
+    });
+
+    for (let attempt = 1; attempt <= 20; attempt++) {
+      try {
+        try {
+          await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
+        } catch {
+          await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
+          this.log.log(`created media bucket ${this.bucket}`);
+        }
+        await this.s3.send(
+          new PutBucketPolicyCommand({ Bucket: this.bucket, Policy: policy }),
+        );
+        return;
+      } catch (err) {
+        if (attempt === 20) {
+          this.log.error(`media bucket initialization failed: ${String(err)}`);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
   }
 
   async upload(file: Express.Multer.File): Promise<Media> {
