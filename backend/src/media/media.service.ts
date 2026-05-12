@@ -26,6 +26,20 @@ const ALLOWED_MIME: Record<string, "image" | "video" | "audio"> = {
 
 const MAX_BYTES = 40 * 1024 * 1024; // 40MB
 
+function normalizePublicBase(raw: string, bucket: string): string {
+  const trimmed = raw.replace(/\/+$/, "");
+  try {
+    const url = new URL(trimmed);
+    const pathParts = url.pathname.split("/").filter(Boolean);
+    if (pathParts.at(-1) !== bucket) {
+      url.pathname = `${url.pathname.replace(/\/+$/, "")}/${bucket}`;
+    }
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return trimmed.endsWith(`/${bucket}`) ? trimmed : `${trimmed}/${bucket}`;
+  }
+}
+
 @Injectable()
 export class MediaService implements OnModuleInit {
   private readonly log = new Logger(MediaService.name);
@@ -35,9 +49,10 @@ export class MediaService implements OnModuleInit {
 
   constructor() {
     this.bucket = process.env.S3_BUCKET ?? "jeoparty-media";
-    this.publicBase =
-      process.env.S3_PUBLIC_URL ??
-      `${process.env.S3_ENDPOINT ?? ""}/${this.bucket}`;
+    this.publicBase = normalizePublicBase(
+      process.env.S3_PUBLIC_URL ?? process.env.S3_ENDPOINT ?? "",
+      this.bucket,
+    );
 
     this.s3 = new S3Client({
       region: process.env.S3_REGION ?? "us-east-1",
