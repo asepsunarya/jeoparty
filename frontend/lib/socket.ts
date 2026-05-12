@@ -24,7 +24,9 @@ export function getBackendUrl(): string {
 export function getSocket(): Socket {
   if (socket) return socket;
   socket = io(getBackendUrl(), {
-    transports: ["websocket"],
+    // Let Socket.IO fall back to HTTP long-polling when a reverse proxy does
+    // not support WebSocket upgrades. It will still upgrade when possible.
+    transports: ["polling", "websocket"],
     autoConnect: true,
     reconnection: true,
     reconnectionDelayMax: 5000,
